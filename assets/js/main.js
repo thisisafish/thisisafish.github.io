@@ -398,4 +398,96 @@
 						$main._show(location.hash.substr(1), true);
 					});
 
+	// Robust carousel initializer
+	(function initCarousel() {
+		function setup() {
+			var carousel = document.getElementById('hero-carousel');
+			if (!carousel) return;
+
+			var track = carousel.querySelector('.carousel-track');
+			var slides = Array.prototype.slice.call(track.children || []);
+			var prevBtn = carousel.querySelector('.carousel-btn.prev');
+			var nextBtn = carousel.querySelector('.carousel-btn.next');
+			var dotsContainer = carousel.querySelector('.carousel-dots');
+			var index = 0;
+			var startX = 0;
+			var isDragging = false;
+
+			// clear existing dots (in case of re-init)
+			dotsContainer.innerHTML = '';
+
+			// create dots
+			slides.forEach(function(_, i) {
+				var b = document.createElement('button');
+				if (i === 0) b.classList.add('active');
+				(function(i){ b.addEventListener('click', function() { goTo(i); }); })(i);
+				dotsContainer.appendChild(b);
+			});
+
+			function update() {
+				track.style.transform = 'translateX(' + (-index * 100) + '%)';
+				var dots = dotsContainer.children;
+				for (var i=0;i<dots.length;i++) dots[i].classList.toggle('active', i === index);
+			}
+
+			function goTo(i) {
+				index = (i + slides.length) % slides.length;
+				update();
+			}
+
+			if (prevBtn) prevBtn.addEventListener('click', function() { goTo(index - 1); });
+			if (nextBtn) nextBtn.addEventListener('click', function() { goTo(index + 1); });
+
+			// pointer events preferred; fallback to mouse/touch
+			var downHandler = function(clientX) {
+				isDragging = true;
+				startX = clientX;
+				track.style.transition = 'none';
+			};
+
+			var moveHandler = function(clientX) {
+				if (!isDragging) return;
+				var dx = clientX - startX;
+				var pct = (dx / carousel.offsetWidth) * 100;
+				track.style.transform = 'translateX(' + (-index * 100 + pct) + '%)';
+			};
+
+			var upHandler = function(clientX) {
+				if (!isDragging) return;
+				isDragging = false;
+				track.style.transition = '';
+				var dx = clientX - startX;
+				if (Math.abs(dx) > carousel.offsetWidth * 0.15) {
+					if (dx < 0) goTo(index + 1); else goTo(index - 1);
+				} else update();
+			};
+
+			if (window.PointerEvent) {
+				track.addEventListener('pointerdown', function(e) { downHandler(e.clientX); track.setPointerCapture && track.setPointerCapture(e.pointerId); });
+				track.addEventListener('pointermove', function(e) { moveHandler(e.clientX); });
+				track.addEventListener('pointerup', function(e) { upHandler(e.clientX); });
+				track.addEventListener('pointercancel', function() { isDragging = false; update(); });
+			} else {
+				// mouse
+				track.addEventListener('mousedown', function(e) { e.preventDefault(); downHandler(e.clientX); });
+				window.addEventListener('mousemove', function(e) { moveHandler(e.clientX); });
+				window.addEventListener('mouseup', function(e) { upHandler(e.clientX); });
+				// touch
+				track.addEventListener('touchstart', function(e) { downHandler(e.touches[0].clientX); });
+				track.addEventListener('touchmove', function(e) { moveHandler(e.touches[0].clientX); });
+				track.addEventListener('touchend', function(e) { upHandler(e.changedTouches[0].clientX); });
+			}
+
+			// initial position
+			update();
+		}
+
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', setup);
+		} else {
+			// DOM already ready
+			setup();
+		}
+	})();
+
 })(jQuery);
